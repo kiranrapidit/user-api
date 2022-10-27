@@ -7,6 +7,18 @@ const log = require("../logger/logger")
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 
+
+
+/*
+    * @params {object} : {
+    "first_name": "kiran",
+    "last_name": "1234",
+    "user_id": "1234",
+    "email": "kiran2@gmail.com",
+    "password": "Kiran@23456789"
+}
+    */
+
 const createUser = async (userdetails) => {
     return new Promise(async (resolve, reject) => {
         var createUserRes
@@ -23,32 +35,86 @@ const createUser = async (userdetails) => {
                 });
                 log.info('registration Failure details...', createUserRes);
             } else {
-                const newUser = new Users(userdetails);
-                // generate salt to hash password
-                const salt = (10);
-                // now we set user password to hashed password
-                newUser.password = await bcrypt.hash(newUser.password, salt);
 
-                await newUser.save().then((user) => {
-                    console.log("------", user)
-                    createUserRes = user;
-                    log.info('registration Successfull details...', createUserRes);
-                }).catch((err) => {
+                let verifiedpass = await checkPasswordValidation(userdetails.password)
+                console.log("------verifiedpass-------", verifiedpass);
+                if (verifiedpass != null) {
                     createUserRes = ({
-                        message: 'Error registering',
-                        err,
+                        message: verifiedpass,
                     });
-                    resolve(createUserRes);
-                    log.info('registration Failure details...', createUserRes);
-                });
+                    log.info('registration Failure details...', verifiedpass);
+                } else {
+                    const newUser = new Users(userdetails);
+                    // generate salt to hash password
+                    const salt = (10);
+                    // now we set user password to hashed password
+                    newUser.password = await bcrypt.hash(newUser.password, salt);
+                    //console.log("--newUser.password--------------", newUser.password)
+                    await newUser.save().then((user) => {
+                        console.log("------", user)
+                        createUserRes = user;
+                        log.info('registration Successfull details...', createUserRes);
+
+                    }).catch((err) => {
+                        createUserRes = ({
+                            message: 'Error registering',
+                            err,
+                        });
+                        resolve(createUserRes);
+                        log.info('registration Failure details...', createUserRes);
+                    });
+                }              
+                resolve(createUserRes);
             }
-            console.log("--createUserRes----", createUserRes)
-            resolve(createUserRes);
         } catch (err) {
             log.info('registration Failure details...', err);
             reject(err)
         }
     })
+}
+
+
+/*
+    * @params {string} : value : passwordValue
+    */
+async function checkPasswordValidation(value) {
+    const isWhitespace = /^(?=.*\s)/;
+    if (isWhitespace.test(value)) {
+        return "Password must not contain Whitespaces.";
+    }
+
+
+    const isContainsUppercase = /^(?=.*[A-Z])/;
+    if (!isContainsUppercase.test(value)) {
+        return "Password must have at least one Uppercase Character.";
+    }
+
+
+    const isContainsLowercase = /^(?=.*[a-z])/;
+    if (!isContainsLowercase.test(value)) {
+        return "Password must have at least one Lowercase Character.";
+    }
+
+
+    const isContainsNumber = /^(?=.*[0-9])/;
+    if (!isContainsNumber.test(value)) {
+        return "Password must contain at least one Digit.";
+    }
+
+
+    const isContainsSymbol =
+        /^(?=.*[~`!@#$%^&*()--+={}\[\]|\\:;"'<>,.?/_₹])/;
+    if (!isContainsSymbol.test(value)) {
+        return "Password must contain at least one Special Symbol.";
+    }
+
+
+    const isValidLength = /^.{10,16}$/;
+    if (!isValidLength.test(value)) {
+        return "Password must be 10-16 Characters Long.";
+    }
+
+    return null;
 }
 
 // async function createNewuser(userdetails) {
@@ -72,11 +138,24 @@ const createUser = async (userdetails) => {
 //     });
 //     return createUserRes;
 // }
+
+/*
+    * @params {object} : {
+   "loginId": "kiran1@gmail.com",
+    "password": "123456789"
+}
+    */
 const loginUser = async (loginDetails) => {
     return new Promise(async (resolve, reject) => {
         let loginRes;
         try {
-            const user = await Users.findOne({ where: { email: loginDetails.email } });
+            const user = await Users.findOne({ where: { [Op.or]: [
+                {
+                  user_id: loginDetails.loginId
+                }, {
+                  email: loginDetails.loginId
+                }
+              ] } });
 
             log.info('existing user details...', user);
 
@@ -157,7 +236,7 @@ const updateUserProfile = async (userdetails) => {
 
                 const id = user.id;
 
-                console.log("--userdetails-------------------------",id)
+                console.log("--userdetails-------------------------", id)
                 const olduser = new Users(userdetails);
                 // generate salt to hash password
                 const salt = (10);
